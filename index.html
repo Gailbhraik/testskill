@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🌍 Globe Explorer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a1a;
+      font-family: 'Segoe UI', sans-serif;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    #canvas-container {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+    }
+
+    /* TOP BAR */
+    #topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 60px;
+      background: rgba(10,10,30,0.85);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(100,180,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 100;
+    }
+    #topbar h1 {
+      font-size: 1.3rem;
+      background: linear-gradient(90deg, #64b4ff, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 700;
+    }
+    #search-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    #search-bar input {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(100,180,255,0.3);
+      border-radius: 20px;
+      padding: 6px 16px;
+      color: #fff;
+      font-size: 0.9rem;
+      outline: none;
+      width: 220px;
+      transition: border 0.2s;
+    }
+    #search-bar input:focus { border-color: #64b4ff; }
+    #search-bar button {
+      background: linear-gradient(135deg, #64b4ff, #a78bfa);
+      border: none;
+      border-radius: 20px;
+      padding: 6px 16px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+    #search-bar button:hover { opacity: 0.85; }
+
+    /* SIDE PANEL */
+    #side-panel {
+      position: fixed;
+      top: 70px;
+      left: 15px;
+      width: 220px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .panel-section {
+      background: rgba(10,10,30,0.8);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(100,180,255,0.2);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .panel-section h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #64b4ff;
+      margin-bottom: 10px;
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .ctrl-btn {
+      background: rgba(100,180,255,0.1);
+      border: 1px solid rgba(100,180,255,0.25);
+      border-radius: 8px;
+      padding: 7px 10px;
+      color: #cde;
+      cursor: pointer;
+      font-size: 0.82rem;
+      text-align: left;
+      transition: background 0.2s, border-color 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .ctrl-btn:hover, .ctrl-btn.active {
+      background: rgba(100,180,255,0.22);
+      border-color: #64b4ff;
+      color: #fff;
+    }
+    .ctrl-btn .icon { font-size: 1rem; }
+
+    /* SPEED SLIDER */
+    .slider-wrap label {
+      font-size: 0.8rem;
+      color: #aac;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    input[type=range] {
+      width: 100%;
+      accent-color: #64b4ff;
+    }
+
+    /* INFO BOX */
+    #info-box {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 280px;
+      background: rgba(10,10,30,0.9);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(100,180,255,0.25);
+      border-radius: 14px;
+      padding: 16px 18px;
+      z-index: 100;
+      display: none;
+      animation: fadeIn 0.3s;
+    }
+    #info-box.visible { display: block; }
+    #info-box h2 { font-size: 1.1rem; color: #64b4ff; margin-bottom: 6px; }
+    #info-box p { font-size: 0.83rem; color: #bbc; line-height: 1.5; }
+    #info-close {
+      position: absolute;
+      top: 10px; right: 12px;
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+
+    /* COORDINATES */
+    #coords {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10,10,30,0.75);
+      border: 1px solid rgba(100,180,255,0.2);
+      border-radius: 20px;
+      padding: 6px 18px;
+      font-size: 0.8rem;
+      color: #9bb;
+      z-index: 100;
+      letter-spacing: 0.5px;
+    }
+
+    /* LOADING */
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: #0a0a1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      gap: 18px;
+    }
+    #loading h2 {
+      font-size: 1.6rem;
+      background: linear-gradient(90deg, #64b4ff, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .spinner {
+      width: 50px; height: 50px;
+      border: 4px solid rgba(100,180,255,0.15);
+      border-top-color: #64b4ff;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* NOTIFICATIONS */
+    #notif {
+      position: fixed;
+      top: 70px;
+      right: 20px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .notif-item {
+      background: rgba(100,180,255,0.15);
+      border: 1px solid rgba(100,180,255,0.3);
+      border-radius: 10px;
+      padding: 8px 16px;
+      font-size: 0.82rem;
+      animation: fadeIn 0.3s;
+      color: #dde;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <h2>🌍 Globe Explorer</h2>
+  <p style="color:#668;font-size:0.85rem">Chargement du globe...</p>
+</div>
+
+<div id="topbar">
+  <h1>🌍 Globe Explorer</h1>
+  <div id="search-bar">
+    <input type="text" id="search-input" placeholder="Chercher un pays, une ville..." />
+    <button onclick="searchLocation()">🔍 Chercher</button>
+  </div>
+  <div style="font-size:0.75rem;color:#668;">Three.js Globe</div>
+</div>
+
+<div id="side-panel">
+  <!-- Rotation -->
+  <div class="panel-section">
+    <h3>🔄 Rotation</h3>
+    <div class="btn-group">
+      <button class="ctrl-btn active" id="btn-autorotate" onclick="toggleAutoRotate()">
+        <span class="icon">▶</span> Auto-rotation
+      </button>
+      <button class="ctrl-btn" onclick="resetView()">
+        <span class="icon">🏠</span> Vue par défaut
+      </button>
+    </div>
+    <div class="slider-wrap" style="margin-top:10px">
+      <label>Vitesse <span id="speed-val">0.3</span></label>
+      <input type="range" min="0" max="2" step="0.1" value="0.3" oninput="setSpeed(this.value)" />
+    </div>
+  </div>
+
+  <!-- Couches -->
+  <div class="panel-section">
+    <h3>🗺️ Couches</h3>
+    <div class="btn-group">
+      <button class="ctrl-btn active" id="btn-clouds" onclick="toggleClouds()">
+        <span class="icon">☁️</span> Nuages
+      </button>
+      <button class="ctrl-btn active" id="btn-atmo" onclick="toggleAtmosphere()">
+        <span class="icon">🌫️</span> Atmosphère
+      </button>
+      <button class="ctrl-btn" id="btn-night" onclick="toggleNightMode()">
+        <span class="icon">🌙</span> Mode nuit
+      </button>
+      <button class="ctrl-btn" id="btn-grid" onclick="toggleGrid()">
+        <span class="icon">📐</span> Grille lat/lon
+      </button>
+    </div>
+  </div>
+
+  <!-- Points d'intérêt -->
+  <div class="panel-section">
+    <h3>📍 Points d'intérêt</h3>
+    <div class="btn-group">
+      <button class="ctrl-btn" onclick="flyToCapital('paris')">
+        <span class="icon">🗼</span> Paris
+      </button>
+      <button class="ctrl-btn" onclick="flyToCapital('nyc')">
+        <span class="icon">🗽</span> New York
+      </button>
+      <button class="ctrl-btn" onclick="flyToCapital('tokyo')">
+        <span class="icon">🗾</span> Tokyo
+      </button>
+      <button class="ctrl-btn" onclick="flyToCapital('sydney')">
+        <span class="icon">🦘</span> Sydney
+      </button>
+      <button class="ctrl-btn" onclick="randomLocation()">
+        <span class="icon">🎲</span> Lieu aléatoire
+      </button>
+    </div>
+  </div>
+
+  <!-- Statistiques -->
+  <div class="panel-section">
+    <h3>📊 Infos</h3>
+    <div style="font-size:0.78rem;color:#9ab;line-height:1.8">
+      <div>🌡️ Temp. surface: <span id="stat-temp" style="color:#64b4ff">~15°C</span></div>
+      <div>🌐 Rayon: <span style="color:#64b4ff">6 371 km</span></div>
+      <div>⚡ FPS: <span id="stat-fps" style="color:#64b4ff">—</span></div>
+      <div>📍 Marqueurs: <span id="stat-markers" style="color:#64b4ff">0</span></div>
+    </div>
+  </div>
+</div>
+
+<div id="canvas-container"></div>
+
+<div id="coords">Lat: — | Lon: —</div>
+
+<div id="info-box">
+  <button id="info-close" onclick="closeInfo()">✕</button>
+  <h2 id="info-title">Titre</h2>
+  <p id="info-text">Description...</p>
+</div>
+
+<div id="notif"></div>
+
+<!-- THREE.JS CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+
+<script>
+// =============================================
+// GLOBE EXPLORER - Main Script
+// =============================================
+
+const container = document.getElementById('canvas-container');
+let W = window.innerWidth, H = window.innerHeight;
+
+// Scene
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 1000);
+camera.position.set(0, 0, 3);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(devicePixelRatio);
+renderer.shadowMap.enabled = true;
+container.appendChild(renderer.domElement);
+
+// Stars background
+const starsGeo = new THREE.BufferGeometry();
+const starCount = 8000;
+const starPositions = new Float32Array(starCount * 3);
+for (let i = 0; i < starCount * 3; i++) starPositions[i] = (Math.random() - 0.5) * 500;
+starsGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.12, transparent: true, opacity: 0.8 });
+const stars = new THREE.Points(starsGeo, starMat);
+scene.add(stars);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0x333355, 1);
+scene.add(ambientLight);
+const sunLight = new THREE.DirectionalLight(0xffeedd, 2.5);
+sunLight.position.set(5, 3, 5);
+scene.add(sunLight);
+
+// Globe
+const globeGeo = new THREE.SphereGeometry(1, 64, 64);
+const textureLoader = new THREE.TextureLoader();
+
+const earthTexture = textureLoader.load(
+  'https://raw.githubusercontent.com/turban/webgl-earth/master/images/2_no_clouds_4k.jpg',
+  () => hideLoading()
+);
+const bumpTexture = textureLoader.load('https://raw.githubusercontent.com/turban/webgl-earth/master/images/elev_bump_4k.jpg');
+const specTexture = textureLoader.load('https://raw.githubusercontent.com/turban/webgl-earth/master/images/water_4k.png');
+const nightTexture = textureLoader.load('https://raw.githubusercontent.com/turban/webgl-earth/master/images/5_night_8k.jpg');
+
+const globeMat = new THREE.MeshPhongMaterial({
+  map: earthTexture,
+  bumpMap: bumpTexture,
+  bumpScale: 0.05,
+  specularMap: specTexture,
+  specular: new THREE.Color(0x226688),
+  shininess: 25,
+});
+
+const globe = new THREE.Mesh(globeGeo, globeMat);
+scene.add(globe);
+
+// Atmosphere
+const atmoGeo = new THREE.SphereGeometry(1.025, 64, 64);
+const atmoMat = new THREE.MeshPhongMaterial({
+  color: 0x4488ff,
+  transparent: true,
+  opacity: 0.13,
+  side: THREE.FrontSide,
+});
+const atmosphere = new THREE.Mesh(atmoGeo, atmoMat);
+scene.add(atmosphere);
+
+// Cloud layer
+const cloudGeo = new THREE.SphereGeometry(1.012, 64, 64);
+const cloudTexture = textureLoader.load('https://raw.githubusercontent.com/turban/webgl-earth/master/images/fair_clouds_4k.png');
+const cloudMat = new THREE.MeshPhongMaterial({
+  map: cloudTexture,
+  transparent: true,
+  opacity: 0.55,
+  depthWrite: false,
+});
+const clouds = new THREE.Mesh(cloudGeo, cloudMat);
+scene.add(clouds);
+
+// Grid lat/lon
+const gridGroup = new THREE.Group();
+const gridMat = new THREE.LineBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.18 });
+for (let lat = -80; lat <= 80; lat += 20) {
+  const pts = [];
+  for (let lon = 0; lon <= 360; lon += 3) {
+    const phi = (90 - lat) * Math.PI / 180;
+    const theta = lon * Math.PI / 180;
+    pts.push(new THREE.Vector3(
+      1.005 * Math.sin(phi) * Math.cos(theta),
+      1.005 * Math.cos(phi),
+      1.005 * Math.sin(phi) * Math.sin(theta)
+    ));
+  }
+  gridGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gridMat));
+}
+for (let lon = 0; lon < 360; lon += 20) {
+  const pts = [];
+  for (let lat = -90; lat <= 90; lat += 3) {
+    const phi = (90 - lat) * Math.PI / 180;
+    const theta = lon * Math.PI / 180;
+    pts.push(new THREE.Vector3(
+      1.005 * Math.sin(phi) * Math.cos(theta),
+      1.005 * Math.cos(phi),
+      1.005 * Math.sin(phi) * Math.sin(theta)
+    ));
+  }
+  gridGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gridMat));
+}
+gridGroup.visible = false;
+scene.add(gridGroup);
+
+// =============================================
+// STATE
+// =============================================
+let autoRotate = true;
+let rotationSpeed = 0.003;
+let isDragging = false;
+let prevMouse = { x: 0, y: 0 };
+let targetRotX = 0, targetRotY = 0;
+let currentRotX = 0, currentRotY = 0;
+let nightMode = false;
+const markers = [];
+let frameCount = 0, lastFpsTime = performance.now();
+
+// =============================================
+// CONTROLS - Mouse drag
+// =============================================
+const canvas = renderer.domElement;
+
+canvas.addEventListener('mousedown', e => {
+  isDragging = true;
+  prevMouse = { x: e.clientX, y: e.clientY };
+  autoRotate = false;
+  document.getElementById('btn-autorotate').classList.remove('active');
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (isDragging) {
+    const dx = e.clientX - prevMouse.x;
+    const dy = e.clientY - prevMouse.y;
+    globe.rotation.y += dx * 0.005;
+    globe.rotation.x += dy * 0.005;
+    clouds.rotation.y = globe.rotation.y;
+    clouds.rotation.x = globe.rotation.x;
+    prevMouse = { x: e.clientX, y: e.clientY };
+  }
+  // Update coordinates
+  updateCoordsFromMouse(e);
+});
+
+canvas.addEventListener('mouseup', () => isDragging = false);
+canvas.addEventListener('mouseleave', () => isDragging = false);
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  isDragging = true;
+  prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  autoRotate = false;
+}, { passive: true });
+canvas.addEventListener('touchmove', e => {
+  if (!isDragging) return;
+  const dx = e.touches[0].clientX - prevMouse.x;
+  const dy = e.touches[0].clientY - prevMouse.y;
+  globe.rotation.y += dx * 0.005;
+  globe.rotation.x += dy * 0.005;
+  clouds.rotation.y = globe.rotation.y;
+  prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}, { passive: true });
+canvas.addEventListener('touchend', () => isDragging = false);
+
+// Zoom
+canvas.addEventListener('wheel', e => {
+  camera.position.z = Math.min(6, Math.max(1.4, camera.position.z + e.deltaY * 0.003));
+});
+
+// Double-click: pin marker
+canvas.addEventListener('dblclick', e => {
+  const pos = getLatLonFromMouse(e);
+  if (pos) placeMarker(pos.lat, pos.lon, '📍 Marqueur', `Lat: ${pos.lat.toFixed(2)}° | Lon: ${pos.lon.toFixed(2)}°`);
+});
+
+// =============================================
+// UTILITIES
+// =============================================
+function latLonToVec3(lat, lon, r = 1.02) {
+  const phi = (90 - lat) * Math.PI / 180;
+  const theta = (lon + 180) * Math.PI / 180;
+  return new THREE.Vector3(
+    -r * Math.sin(phi) * Math.cos(theta),
+    r * Math.cos(phi),
+    r * Math.sin(phi) * Math.sin(theta)
+  );
+}
+
+function getLatLonFromMouse(e) {
+  const rect = canvas.getBoundingClientRect();
+  const mouse = new THREE.Vector2(
+    ((e.clientX - rect.left) / rect.width) * 2 - 1,
+    -((e.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObject(globe);
+  if (hits.length > 0) {
+    const p = hits[0].point.clone().applyEuler(new THREE.Euler(-globe.rotation.x, -globe.rotation.y, 0));
+    const lat = 90 - Math.acos(p.y / p.length()) * 180 / Math.PI;
+    const lon = (Math.atan2(p.z, -p.x) * 180 / Math.PI) - 180;
+    return { lat, lon };
+  }
+  return null;
+}
+
+function updateCoordsFromMouse(e) {
+  const pos = getLatLonFromMouse(e);
+  const el = document.getElementById('coords');
+  if (pos) el.textContent = `Lat: ${pos.lat.toFixed(3)}° | Lon: ${pos.lon.toFixed(3)}`;
+}
+
+function hideLoading() {
+  document.getElementById('loading').style.opacity = '0';
+  document.getElementById('loading').style.transition = 'opacity 0.8s';
+  setTimeout(() => document.getElementById('loading').style.display = 'none', 800);
+}
+
+function notify(msg) {
+  const el = document.createElement('div');
+  el.className = 'notif-item';
+  el.textContent = msg;
+  document.getElementById('notif').prepend(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// =============================================
+// MARKERS
+// =============================================
+function placeMarker(lat, lon, title = '📍', desc = '') {
+  const pos = latLonToVec3(lat, lon, 1.03);
+  const geo = new THREE.SphereGeometry(0.018, 8, 8);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xff4466 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(pos);
+  mesh.userData = { lat, lon, title, desc };
+  globe.add(mesh);
+  markers.push(mesh);
+  document.getElementById('stat-markers').textContent = markers.length;
+  notify(`📍 Marqueur posé: ${title}`);
+}
+
+// Click on marker -> show info
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mouse = new THREE.Vector2(
+    ((e.clientX - rect.left) / rect.width) * 2 - 1,
+    -((e.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(markers);
+  if (hits.length > 0) {
+    const d = hits[0].object.userData;
+    showInfo(d.title, d.desc || `Lat: ${d.lat.toFixed(2)}° | Lon: ${d.lon.toFixed(2)}°`);
+  }
+});
+
+// =============================================
+// CONTROLS FUNCTIONS
+// =============================================
+function toggleAutoRotate() {
+  autoRotate = !autoRotate;
+  document.getElementById('btn-autorotate').classList.toggle('active', autoRotate);
+  notify(autoRotate ? '▶ Auto-rotation activée' : '⏸ Auto-rotation pausée');
+}
+
+function setSpeed(v) {
+  rotationSpeed = parseFloat(v) * 0.01;
+  document.getElementById('speed-val').textContent = v;
+}
+
+function resetView() {
+  camera.position.set(0, 0, 3);
+  globe.rotation.set(0.3, 0, 0);
+  clouds.rotation.set(0.3, 0, 0);
+  notify('🏠 Vue réinitialisée');
+}
+
+function toggleClouds() {
+  clouds.visible = !clouds.visible;
+  document.getElementById('btn-clouds').classList.toggle('active', clouds.visible);
+  notify(clouds.visible ? '☁️ Nuages activés' : '☁️ Nuages désactivés');
+}
+
+function toggleAtmosphere() {
+  atmosphere.visible = !atmosphere.visible;
+  document.getElementById('btn-atmo').classList.toggle('active', atmosphere.visible);
+  notify(atmosphere.visible ? '🌫️ Atmosphère activée' : '🌫️ Atmosphère désactivée');
+}
+
+function toggleNightMode() {
+  nightMode = !nightMode;
+  globeMat.map = nightMode ? nightTexture : earthTexture;
+  globeMat.needsUpdate = true;
+  sunLight.intensity = nightMode ? 0.5 : 2.5;
+  document.getElementById('btn-night').classList.toggle('active', nightMode);
+  notify(nightMode ? '🌙 Mode nuit activé' : '☀️ Mode jour activé');
+}
+
+function toggleGrid() {
+  gridGroup.visible = !gridGroup.visible;
+  document.getElementById('btn-grid').classList.toggle('active', gridGroup.visible);
+  notify(gridGroup.visible ? '📐 Grille activée' : '📐 Grille désactivée');
+}
+
+// Fly to location with smooth animation
+const capitals = {
+  paris:  { lat: 48.85, lon: 2.35,   name: 'Paris 🗼',    desc: 'Capitale de la France. Population: ~2.1M. Tour Eiffel, Louvre, Notre-Dame.' },
+  nyc:    { lat: 40.71, lon: -74.01, name: 'New York 🗽',  desc: 'La ville qui ne dort jamais. Population: ~8.3M. Empire State Building, Central Park.' },
+  tokyo:  { lat: 35.68, lon: 139.69, name: 'Tokyo 🗾',    desc: 'Capitale du Japon. Population: ~14M. L\'une des plus grandes métropoles mondiales.' },
+  sydney: { lat: -33.87, lon: 151.21, name: 'Sydney 🦘',  desc: 'Plus grande ville d\'Australie. Opéra emblématique, Harbour Bridge.' },
+};
+
+function flyToCapital(key) {
+  const c = capitals[key];
+  if (!c) return;
+  const targetLat = c.lat * Math.PI / 180;
+  const targetLon = (c.lon + 180) * Math.PI / 180;
+  globe.rotation.x = -targetLat + 0.3;
+  globe.rotation.y = -targetLon + Math.PI;
+  clouds.rotation.x = globe.rotation.x;
+  clouds.rotation.y = globe.rotation.y;
+  autoRotate = false;
+  document.getElementById('btn-autorotate').classList.remove('active');
+  showInfo(c.name, c.desc);
+  notify(`✈️ Vol vers ${c.name}`);
+}
+
+function randomLocation() {
+  const lat = (Math.random() * 180 - 90);
+  const lon = (Math.random() * 360 - 180);
+  globe.rotation.x = -(lat * Math.PI / 180) + 0.3;
+  globe.rotation.y = -((lon + 180) * Math.PI / 180) + Math.PI;
+  clouds.rotation.x = globe.rotation.x;
+  clouds.rotation.y = globe.rotation.y;
+  autoRotate = false;
+  document.getElementById('btn-autorotate').classList.remove('active');
+  placeMarker(lat, lon, '🎲 Lieu aléatoire', `Lat: ${lat.toFixed(2)}° | Lon: ${lon.toFixed(2)}°`);
+  notify(`🎲 Destination aléatoire: ${lat.toFixed(1)}°, ${lon.toFixed(1)}°`);
+}
+
+function searchLocation() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  if (!q) return;
+  const found = Object.values(capitals).find(c => c.name.toLowerCase().includes(q));
+  if (found) {
+    flyToCapital(Object.keys(capitals).find(k => capitals[k] === found));
+  } else {
+    notify(`🔍 "${q}" non trouvé dans la base locale`);
+  }
+}
+
+document.getElementById('search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') searchLocation();
+});
+
+function showInfo(title, text) {
+  document.getElementById('info-title').textContent = title;
+  document.getElementById('info-text').textContent = text;
+  document.getElementById('info-box').classList.add('visible');
+}
+
+function closeInfo() {
+  document.getElementById('info-box').classList.remove('visible');
+}
+
+// =============================================
+// ANIMATE
+// =============================================
+function animate() {
+  requestAnimationFrame(animate);
+  if (autoRotate) {
+    globe.rotation.y += rotationSpeed;
+    clouds.rotation.y += rotationSpeed * 1.1;
+  }
+  // FPS
+  frameCount++;
+  const now = performance.now();
+  if (now - lastFpsTime >= 1000) {
+    document.getElementById('stat-fps').textContent = frameCount;
+    frameCount = 0;
+    lastFpsTime = now;
+  }
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  W = window.innerWidth; H = window.innerHeight;
+  camera.aspect = W / H;
+  camera.updateProjectionMatrix();
+  renderer.setSize(W, H);
+});
+
+// Preset markers
+placeMarker(48.85, 2.35, '🗼 Paris', 'Capitale de la France');
+placeMarker(40.71, -74.01, '🗽 New York', 'La ville qui ne dort jamais');
+placeMarker(35.68, 139.69, '🗾 Tokyo', 'Capitale du Japon');
+placeMarker(-33.87, 151.21, '🦘 Sydney', 'Australie');
+
+animate();
+</script>
+</body>
+</html>
