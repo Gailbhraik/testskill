@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dofus - Carte Interactive</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0d0d0d;
+      font-family: 'Segoe UI', sans-serif;
+      color: #e0c97f;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1a0a00, #3d1c00);
+      border-bottom: 2px solid #c8922a;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 1000;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      color: #f5c843;
+      text-shadow: 0 0 10px #c8922a88;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    header span {
+      font-size: 0.85rem;
+      color: #a07040;
+    }
+
+    #controls {
+      background: #1a1a1a;
+      border-bottom: 1px solid #3a2a10;
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      z-index: 1000;
+    }
+
+    #search-box {
+      background: #111;
+      border: 1px solid #c8922a;
+      border-radius: 6px;
+      color: #e0c97f;
+      padding: 6px 12px;
+      font-size: 0.9rem;
+      width: 220px;
+      outline: none;
+    }
+
+    #search-box::placeholder { color: #604020; }
+
+    .btn {
+      background: linear-gradient(135deg, #3d1c00, #6a3300);
+      border: 1px solid #c8922a;
+      color: #f5c843;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: linear-gradient(135deg, #6a3300, #9a5000);
+      box-shadow: 0 0 8px #c8922a55;
+    }
+
+    #coords-display {
+      margin-left: auto;
+      font-size: 0.85rem;
+      color: #a07040;
+      font-family: monospace;
+    }
+
+    #map {
+      flex: 1;
+      background: #0d0d0d;
+    }
+
+    /* Leaflet dark override */
+    .leaflet-container { background: #0d0d0d; }
+
+    .leaflet-control-zoom a {
+      background: #1a1a1a !important;
+      color: #f5c843 !important;
+      border-color: #c8922a !important;
+    }
+
+    .leaflet-control-zoom a:hover {
+      background: #3d1c00 !important;
+    }
+
+    /* Custom popup */
+    .leaflet-popup-content-wrapper {
+      background: #1a0e00;
+      border: 1px solid #c8922a;
+      border-radius: 8px;
+      color: #e0c97f;
+    }
+
+    .leaflet-popup-tip { background: #c8922a; }
+
+    .popup-title {
+      font-size: 1rem;
+      font-weight: bold;
+      color: #f5c843;
+      margin-bottom: 4px;
+    }
+
+    .popup-coords {
+      font-size: 0.8rem;
+      color: #a07040;
+      font-family: monospace;
+    }
+
+    /* Tooltip coords on hover */
+    #tooltip {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #1a0e00cc;
+      border: 1px solid #c8922a;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #f5c843;
+      pointer-events: none;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🗺 Dofus — Carte Interactive</h1>
+  <span>World of Twelve</span>
+</header>
+
+<div id="controls">
+  <input id="search-box" type="text" placeholder="Rechercher une zone... (ex: Astrub)" />
+  <button class="btn" onclick="searchZone()">🔍 Chercher</button>
+  <button class="btn" onclick="resetView()">⟳ Réinitialiser</button>
+  <span id="coords-display">X: — | Y: —</span>
+</div>
+
+<div id="map"></div>
+<div id="tooltip">X: — | Y: —</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // ─── Map config ───────────────────────────────────────────────────────────
+  // Dofus map is a fixed pixel image split into tiles
+  // The full map is roughly 5632 x 4096 pixels (at zoom 0)
+  // We use a simple CRS (pixel-based) to overlay it
+
+  const MAP_WIDTH  = 5632;
+  const MAP_HEIGHT = 4096;
+
+  // Dofus in-game coords range: X [-77, 35], Y [-72, 40]
+  const DOFUS_X_MIN = -77, DOFUS_X_MAX = 35;
+  const DOFUS_Y_MIN = -72, DOFUS_Y_MAX = 40;
+
+  // Convert pixel [y, x] → Dofus [X, Y]
+  function pixelToDofus(latLng) {
+    const dx = DOFUS_X_MIN + (latLng.lng / MAP_WIDTH)  * (DOFUS_X_MAX - DOFUS_X_MIN);
+    const dy = DOFUS_Y_MIN + (latLng.lat / MAP_HEIGHT) * (DOFUS_Y_MAX - DOFUS_Y_MIN);
+    return { x: Math.round(dx), y: Math.round(dy) };
+  }
+
+  const crs = L.CRS.Simple;
+
+  const map = L.map('map', {
+    crs: crs,
+    minZoom: -3,
+    maxZoom: 2,
+    zoomSnap: 0.5,
+    attributionControl: false,
+  });
+
+  // ─── Tile layer using dofus-map.fr tiles ──────────────────────────────────
+  // Public tile service from the Dofus community
+  const tileLayer = L.tileLayer(
+    'https://dofus-map.com/images/map/bg/{z}/{x}_{y}.jpg',
+    {
+      tileSize: 256,
+      noWrap: true,
+      errorTileUrl: 'https://via.placeholder.com/256/0d0d0d/333333?text=.',
+    }
+  );
+
+  // Fallback: use the full Dofus map image from wakfu/dofus community mirrors
+  const imageUrl = 'https://www.dofus.com/img/common/world-map.jpg';
+  const imageBounds = [[0, 0], [MAP_HEIGHT, MAP_WIDTH]];
+
+  L.imageOverlay(imageUrl, imageBounds, { opacity: 1 }).addTo(map);
+  map.fitBounds(imageBounds);
+
+  // ─── Coords display ──────────────────────────────────────────────────────
+  const coordsDisplay = document.getElementById('coords-display');
+  const tooltip = document.getElementById('tooltip');
+
+  map.on('mousemove', (e) => {
+    const d = pixelToDofus(e.latlng);
+    const txt = `X: ${d.x} | Y: ${d.y}`;
+    coordsDisplay.textContent = txt;
+    tooltip.textContent = txt;
+  });
+
+  // ─── Click → place marker ─────────────────────────────────────────────────
+  let clickMarker = null;
+
+  const markerIcon = L.divIcon({
+    className: '',
+    html: `<div style="
+      width:16px; height:16px;
+      background:#f5c843;
+      border:2px solid #c8922a;
+      border-radius:50%;
+      box-shadow: 0 0 8px #f5c843aa;
+    "></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+
+  map.on('click', (e) => {
+    const d = pixelToDofus(e.latlng);
+    if (clickMarker) map.removeLayer(clickMarker);
+    clickMarker = L.marker(e.latlng, { icon: markerIcon }).addTo(map);
+    clickMarker.bindPopup(`
+      <div class="popup-title">📍 Position sélectionnée</div>
+      <div class="popup-coords">X: ${d.x} | Y: ${d.y}</div>
+    `).openPopup();
+  });
+
+  // ─── Named zones ─────────────────────────────────────────────────────────
+  // Approximate pixel positions of major zones
+  const zones = [
+    { name: 'Astrub',          x: 2900, y: 2100, dx:  5, dy: -18 },
+    { name: 'Amakna',          x: 2600, y: 1900, dx: -2, dy:  -5 },
+    { name: 'Bonta',           x: 1600, y: 2400, dx:-32, dy:  -1 },
+    { name: 'Brakmar',         x: 3600, y: 2600, dx: 26, dy:  12 },
+    { name: 'Sufokia',         x: 3200, y: 3200, dx: 18, dy:  26 },
+    { name: 'Pandala',         x: 4400, y: 1200, dx: 39, dy: -34 },
+    { name: 'Île de Moon',     x: 4800, y: 3000, dx: 46, dy:  19 },
+    { name: 'Frigost',         x: 1200, y: 600,  dx:-42, dy: -65 },
+    { name: 'Otomaï',          x: 700,  y: 3400, dx:-53, dy:  30 },
+    { name: 'Eliotrope Village', x:3800, y:1100, dx: 29, dy:-38 },
+  ];
+
+  const zoneIcon = L.divIcon({
+    className: '',
+    html: `<div style="
+      width:10px; height:10px;
+      background:#c8922a;
+      border:2px solid #f5c843;
+      border-radius:50%;
+    "></div>`,
+    iconSize: [10, 10],
+    iconAnchor: [5, 5],
+  });
+
+  zones.forEach(z => {
+    const marker = L.marker([z.y, z.x], { icon: zoneIcon }).addTo(map);
+    marker.bindTooltip(`<strong>${z.name}</strong><br><span style="font-size:0.8em;color:#a07040">X:${z.dx} Y:${z.dy}</span>`, {
+      permanent: false,
+      className: '',
+      direction: 'top',
+    });
+  });
+
+  // ─── Zone search ─────────────────────────────────────────────────────────
+  function searchZone() {
+    const query = document.getElementById('search-box').value.toLowerCase().trim();
+    const found = zones.find(z => z.name.toLowerCase().includes(query));
+    if (found) {
+      map.setView([found.y, found.x], 0);
+      if (clickMarker) map.removeLayer(clickMarker);
+      clickMarker = L.marker([found.y, found.x], { icon: markerIcon }).addTo(map);
+      clickMarker.bindPopup(`
+        <div class="popup-title">📍 ${found.name}</div>
+        <div class="popup-coords">X: ${found.dx} | Y: ${found.dy}</div>
+      `).openPopup();
+    } else {
+      alert('Zone introuvable : ' + query);
+    }
+  }
+
+  document.getElementById('search-box').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') searchZone();
+  });
+
+  function resetView() {
+    map.fitBounds(imageBounds);
+    if (clickMarker) { map.removeLayer(clickMarker); clickMarker = null; }
+  }
+</script>
+</body>
+</html>
