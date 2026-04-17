@@ -1,41 +1,33 @@
-# 🌍 Globe Explorer
+# 🪙 Solana Market Cap Tracker
 
-Un explorateur de globe terrestre interactif en 3D, construit avec **Three.js**.
+Un dashboard interactif pour comparer le market cap des tokens sur la blockchain **Solana**.
 
 ## 🚀 Démo
 
-Ouvre simplement `index.html` dans ton navigateur, ou héberge-le sur GitHub Pages.
+Ouvre `index.html` dans ton navigateur ou héberge sur GitHub Pages.
 
 ## ✨ Fonctionnalités
 
-- 🌍 **Globe 3D réaliste** avec textures haute résolution (jour, nuit, élévation, océans)
-- ☁️ **Couche nuages** animée et toggleable
-- 🌫️ **Atmosphère** avec effet de lueur bleue
-- 🖱️ **Rotation drag** à la souris / tactile
-- 🔍 **Zoom** à la molette
-- 📍 **Marqueurs interactifs** (double-clic pour en poser)
-- ✈️ **Vol vers des villes** (Paris, New York, Tokyo, Sydney)
-- 🎲 **Lieu aléatoire** avec marqueur automatique
-- 🌙 **Mode nuit** avec texture lumières de la Terre
-- 📐 **Grille lat/lon** superposable
-- 🔍 **Barre de recherche** de lieux
-- 📊 **Stats en temps réel** (FPS, marqueurs)
-- 🌟 **Fond étoilé** animé
+- 📊 **Tableau comparatif** des top tokens Solana avec Market Cap, Prix, Volume, Variation 24h/7j
+- 🥧 **Doughnut chart** — Répartition du market cap (Top 8)
+- 📈 **Bar chart** — Variation 24h des Top 10
+- 📉 **Sparklines 7j** en temps réel pour chaque token
+- 🔍 **Barre de recherche** + filtres (Hausse/Baisse/Top 10)
+- 💡 **Carte détail** avec graphique 7j au clic sur un token
+- ⟳ **Rafraîchissement automatique** toutes les 60 secondes
+- 📡 **API CoinGecko** (données en live) avec fallback démo
+- 🏆 **Stats globales** : Market Cap total, Volume, Gaineur/Perdant du jour
 
 ## 🛠️ Technologies
 
-- [Three.js r134](https://threejs.org/)
 - HTML5 / CSS3 / JavaScript Vanilla
-- Textures: [turban/webgl-earth](https://github.com/turban/webgl-earth)
-
-## 📂 Structure
-
-```
-testskill/
-├── index.html   # Application complète (single-file)
-└── README.md
-```
+- [Chart.js v4](https://www.chartjs.org/)
+- [CoinGecko API](https://www.coingecko.com/en/api)
 
 ## 🌐 GitHub Pages
 
-Activer dans Settings → Pages → Source: `main` / `root`.
+Activer dans **Settings → Pages → Source: main / root**.
+
+## 📦 Tokens suivis
+
+SOL, RAY, BONK, JTO, PYTH, RENDER, HNT, JUP, W, MNDE, et plus...
